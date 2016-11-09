@@ -1,0 +1,2 @@
+default :
+	ocamlbuild main.native --
