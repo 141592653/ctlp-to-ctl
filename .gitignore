@@ -1,0 +1,6 @@
+*.out
+*.swp
+*~
+*.pdf
+*.native
+_build/
