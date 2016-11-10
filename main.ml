@@ -459,6 +459,8 @@ let formula =
 	       )
 	    )
     ))
+
+let another_formula = ExistsP (AndPP (UntilP(APP 0,APP 1) , AndPP(UntilP(APP 1,APP 2),  AndPP(NextP(APP 1),GloballyP (ExistsP (UntilP(APP 1,APP 0)))))))
 	
 
 		     
@@ -469,7 +471,11 @@ let main () =
 
 let () = main()
 
-(* En utilisant le top-level, j'obtiens pour formula le résultat suivant : 
+(* 
+
+Je n'ai pas écrit de fonctions d'affichage pour les tests : j'ai utilisé le top-level avec #load.
+J'ai fait principalement mes tests sur formula et sur ses sous-formules 
+En utilisant le top-level, j'obtiens pour formula le résultat suivant : 
 Or
  (And (AP 0,
    Exists (Next (And (And (Not (AP 0), AP 0), Exists (Globally (AP 0)))))),
@@ -493,4 +499,132 @@ Or
    (And (True,
      Exists (Next (And (And (Not True, Not True), Exists (Globally True))))),
    And (True, Exists (Next (And (Not True, Exists (Globally True))))))))
+
+
+
+
+
+Sur another_formula, j'obtiens une très grosse formule qui montre l'explosion combinatoire très rapide. Les points de suspensions sont ajoutés par le top-level:
+ Or
+ (And (And (AP 1, AP 2),
+   And
+    (Or (And (AP 0, And (True, Exists (Next (And (True, True))))),
+      Or
+       (And (True,
+         And (True,
+          Exists
+           (Next
+             (And (True,
+               Or
+                (Exists
+                  (Until (And (AP 1, True),
+                    And (AP 0, Exists (Globally True)))),
+                Not True)))))),
+       Not True)),
+    Exists (Next (And (AP 1, True))))),
+ Or
+  (And (AP 2,
+    And
+     (Or (And (AP 0, And (True, Exists (Next (And (True, True))))),
+       Or
+        (And (True,
+          And (True,
+           Exists
+            (Next
+              (And (True,
+                Or
+                 (Exists
+                   (Until (And (AP 1, True),
+                     And (AP 0, Exists (Globally True)))),
+                 Not True)))))),
+        Not True)),
+     Exists
+      (Next
+        (And (AP 1,
+          Or
+           (Exists
+             (Until
+               (And (AP 0,
+                 Or
+                  (And (AP 0, And (True, Exists (Next (And (True, True))))),
+                  Or
+                   (And (True,
+                     And (True,
+                      Exists
+                       (Next
+                         (And (True,
+                           Or
+                            (Exists
+                              (Until (And (AP 1, True),
+                                And (AP 0, Exists (Globally True)))),
+                            Not True)))))),
+                   Not True))),
+               And (AP 1,
+                Exists
+                 (Globally
+                   (Or
+                     (And (AP 0,
+                       And (True, Exists (Next (And (True, True))))),
+                     Or
+                      (And (True,
+                        And (True,
+                         Exists
+                          (Next
+                            (And (True,
+                              Or
+                               (Exists
+                                 (Until (And (AP 1, True),
+                                   And (AP 0, Exists (Globally True)))),
+                               Not True)))))),
+                      Not True))))))),
+           Not True)))))),
+  Or
+   (And (AP 1,
+     And
+      (Or (And (AP 0, And (True, Exists (Next (And (True, True))))),
+        Or
+         (And (True,
+           And (True,
+            Exists
+             (Next
+               (And (True,
+                 Or
+                  (Exists
+                    (Until (And (AP 1, True),
+                      And (AP 0, Exists (Globally True)))),
+                  Not True)))))),
+         Not True)),
+      Exists
+       (Next
+         (And (AP 1,
+           Or
+            (Exists
+              (Until
+                (And (AP 1,
+                  Or
+                   (And (AP 0, And (True, Exists (Next (And (True, True))))),
+                   Or
+                    (And (True,
+                      And (True,
+                       Exists
+                        (Next
+                          (And (True,
+                            Or
+                             (Exists
+                               (Until (And (AP 1, True),
+                                 And (AP 0, Exists (Globally True)))),
+                             Not True)))))),
+                    Not True))),
+                And (AP 2,
+                 Exists
+                  (Globally
+                    (Or
+                      (And (AP 0,
+                        And (True, Exists (Next (And (True, True))))),
+                      Or
+                       (And (True,
+                         And (True, Exists (Next (And (True, ...))))),
+                       ...))))))),
+            ...)))))),
+   ...)))
 *)
