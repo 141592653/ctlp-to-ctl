@@ -58,6 +58,10 @@ module type SET = sig
 				
   (**Renvoie le complémentaire de l'ensemble passé en argument*)
   val complementary : t -> t
+
+  (**Permet d'extraire les éléments de la liste correspondant 
+    * aux numéros des éléments de s*)
+  val extract : 'a list -> t -> 'a list
 end
 
 (** Implémentation de [SET] étant donné un [F:FIN]. *)

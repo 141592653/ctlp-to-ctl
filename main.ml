@@ -1,276 +1,3 @@
-(* Ce fichier permet d'implémenter une fonction renvoyant la nème permutation 
- * dans l'ordre lexicographique*)
-
-
-(** Factorielle*)
-let rec fact n = match n with
-  |0 -> 1
-  |_ -> n * fact (n-1)
-
-(** Permet d'ajouter 1 à tous les éléments de la liste supérieurs à k*)
-let rec succ_sup l k = match l with
-  |[] -> []
-  |x::q -> if x >= k then
-	     (x+1)::(succ_sup q k)
-	   else
-	     x::(succ_sup q k)
-
-
-(** Renvoie la nème permutation de {1,...,m} si elle existe
- *  et None sinon *)
-let perm n m =
-  let rec perm_tmp n m fact =
-    match m with
-    |0 -> []
-    |_ -> let q = n/fact and r = n mod fact in
-	  
-	  q :: (succ_sup (perm_tmp
-			    r
-			    (m-1)
-			    (fact/(if m>1 then m-1 else 1))
-			 )
-			 q
-	       )
-  in
-  perm_tmp n m (fact (m-1))
-  
-
-(*ce fichier contient un module permettant de gérer les ensembles finis
- * de manière efficace. Il a été codé par Alice RIXTE dans le cadre du
- * DM du cours de programmation avancée. Le complémentaire et le générateurs
- * ont été ajoutés pour le DM de vérification. *)
-
-
-(** Signature représentant les types finis.
- *
- * Le type [t] est équipé de fonctions [to_int] et [of_int],
- * qu'on supposera inverses l'une de l'autre.
- *
- * De plus le type est supposé fini, c'est à dire qu'on ne
- * rencontrera que des valeurs [x] telles que
- * [0 <= to_int x < max].
- *
- * La fonction [of_int] ne devra être appelée que sur des
- * valeurs [i] tel que [0 <= i < max]. *)
-module type FIN = sig
-    type t
-    val max : int
-    val to_int : t -> int
-    val of_int : int -> t
-  end
-
-(** Signature décrivant un type d'ensembles [t] dont les éléments
- * sont dans [elt].
- *
- * Les opérations ne modifient jamais en place un ensemble,
- * mais ceux-ci sont manipulés dans un style persistant.
- *
- * L'égalité structurelle d'OCaml sur [t] doit correspondre à
- * l'égalité ensembliste. *)
-module type SET = sig
-    type t
-    type elt
-
-    (** Cardinal d'un ensemble, en temps constant *)
-    val cardinal : t -> int
-
-    (** Ensemble vide *)
-    val empty : t
-
-    (** Création d'un ensemble contenant tous les éléments
-     * pour lesquels une fonction est vraie. *)
-    val init : (elt -> bool) -> t
-
-    (** Ajout d'un élément *)
-    val add : t -> elt -> t
-
-    (** Suppression d'un élément *)
-    val remove : t -> elt -> t
-
-    (** Test d'appartenance *)
-    val member : t -> elt -> bool
-
-    (** Détermine si le premier ensemble est sous-ensemble du second *)
-    val subset : t -> t -> bool
-
-    (** Itération d'une fonction sur les éléments d'un ensemble *)
-    val iter : t -> (elt -> unit) -> unit
-				       
-    (** Générateur de l'ensemble des parties de l'univers*)
-    val sub_generator : unit -> unit -> t option
-
-    (**Renvoie le complémentaire de l'ensemble passé en argument*)
-    val complementary : t -> t
-
-    (**Permet d'extraire les éléments de la liste correspondant 
-     * aux numéros des éléments de s*)
-    val extract : 'a list -> t -> 'a list
-  end
-
-		    
-module Make (F : FIN) : SET with type elt = F.t = struct
-  
-  type t = Int64.t array
-  type elt = F.t
-
-  let t_size = (F.max / 64) + 2
-  (*Permet de connaître la position de l'élément dans l'ensemble*)
-  let get_pos int_el = int_el / 64 + 1
-  (*Permet de connaître le numéro du bit une fois l'entier 64 bits identifié*)
-  let get_bit int_el = int_el mod 64
-  (*Permet d'obtenir un masque ne comportant que des 0 hormis un 1 sur l'élément qui nous intéresse *)
-  let mask int_el = Int64.shift_left Int64.one (get_bit int_el)
-
-				     
-  (* Le premier entier du tableau est le cardinal*)
-  let cardinal e =  Int64.to_int e.(0)
-				     
-  let empty = Array.make t_size Int64.zero
-
-  (*Ici, on n'utilise pas la fonction add car ce serait plus lent*)
-  let init f =
-    let new_e = Array.make t_size Int64.zero in
-    for i = 0 to F.max do
-      if f (F.of_int i) then
-	(
-	  new_e.(0) <- Int64.succ new_e.(0);
-	  let pos_i = get_pos i in 
-      	  new_e.(pos_i) <- Int64.logor new_e.(pos_i) (mask i) 
-	)
-    done;
-    new_e
-
-      
-      
-  let add e el =
-    let int_el = F.to_int el in 
-    let new_e = Array.copy e in 
-    let pos_el = get_pos int_el in 
-    new_e.(pos_el) <- Int64.logor (mask int_el) e.(pos_el);
-    (*Si les entiers sont différents, c'est que l'élément ne se trouvait pas dans l'ensemble *)
-    if Int64.compare new_e.(pos_el) e.(pos_el) <> 0 then
-      new_e.(0) <- Int64.succ new_e.(0);
-    new_e
-
-      
-
-  (*La même mais en inversant tout*)
-  let remove e el =
-    let int_el = F.to_int el in 
-    let new_e = Array.copy e in 
-    let pos_el = get_pos int_el in 
-    new_e.(pos_el) <- Int64.logand (Int64.lognot (mask int_el)) e.(pos_el);
-    (*Si les entiers sont différents, c'est que l'élément ne se trouvait pas dans l'ensemble *)
-    if Int64.compare new_e.(pos_el) e.(pos_el) <> 0 then
-      new_e.(0) <- Int64.pred new_e.(0);
-    new_e
-
-
-  let member e el =
-    let int_el = F.to_int el in 
-    Int64.compare (Int64.logand (mask int_el) e.(get_pos int_el)) Int64.zero <> 0
-
-  (*pour que e1 soit un sous-ensemble de e2, si un élément appartient à e1, alors il appartient à e2. On peut donc utiliser l'implication logique et on ne doit alors obtenir que des 1. On veut donc que la négation de e1 => e2 soit 0. Par conséquent, on peut utiliser la formule e1/\~e2 et vérifier que le résultat est nul*)
-  let subset e1 e2 =
-    let sub = ref true and i = ref 1 in
-    while !sub && !i < t_size do
-      sub := Int64.compare (Int64.logand e1.(!i) (Int64.lognot e2.(!i))) Int64.zero = 0;
-      i := !i + 1
-    done;
-    !sub
-
-
-     
-  let iter e f =
-    for i = 0 to F.max do
-      let el = F.of_int i in
-      if member e el then
-	f el
-    done
-
-
-  (*Ce mask permet de mettre à zéro toutes les valeurs au dessus de F.max*)
-  let cut_sup_max =
-    let mask_sup = ref Int64.zero in
-    for i = 0 to F.max mod 64 do
-      mask_sup := Int64.logor (Int64.shift_left Int64.one i) !mask_sup
-    done;
-    !mask_sup
-
-     
-  let complementary e =
-    let c = Array.copy e in
-    for i = 1 to t_size - 1 do
-      c.(i) <- Int64.lognot c.(i)
-    done;
-    c.(t_size - 1) <- Int64.logand c.(t_size - 1) cut_sup_max;
-    c
-
-  let sub_generator () =
-    let e = Array.copy empty  in
-    let num_e = ref 0 and nb_sub = int_of_float (2. ** (float_of_int F.max)) in 
-    let next () =
-      if !num_e < nb_sub then
-	begin
-	  let ret = Array.copy e in
-	  num_e := !num_e + 1;
-	  let j = ref 1 and continue = ref true in
-	  while !j < t_size && !continue do
-	    e.(!j) <- Int64.succ e.(!j);
-	    continue :=  Int64.compare e.(!j) Int64.zero = 0;
-	    j := !j + 1;					     
-	  done;
-	  Some ret
-	end
-      else
-	None
-
-    in
-
-    next
-
-      
-  let extract l s =
-    let rec extract_tmp l n = match l with
-      |[]-> []
-      |x::q -> if member s (F.of_int n) then
-		 x::(extract_tmp q (n+1))
-	       else
-		 extract_tmp q (n+1)
-    in
-    extract_tmp l 0
-      
-      
-
-
-end
-
-
-(*tests*)
-						      
-module I:FIN = struct
-  type t = int
-  let max = 1000
-  let to_int n = n 
-  let of_int n = n mod 1000
-end
-
-module S = Make(I)
-
-let s = ref (S.empty)
-let pairs = S.init (fun i -> let n = I.to_int i in n mod 2 = 0)
-let impairs = S.init (fun i -> let n = I.to_int i in n mod 2 = 1)
-let pairs2 = S.init (fun i -> let n = I.to_int i in n mod 2 = 0)
-let p = (S.init (fun i -> let n = I.to_int i in n = 10 || n = 0 || n = 33))
-
-module J:FIN = struct
-  type t = int
-  let max = 3
-  let to_int n = n
-  let of_int n = n mod 3
-end
-module T = Make(J)
-
 
 
 (*Ceci est un convertisseur des formules CTL+ vers les formules CTL
@@ -281,6 +8,9 @@ I - Déclarations utiles
 II - Conversion vers la forme (2) de la question 4
 III - Conversion de la forme (2) vers CTL
 IV -  Fonctions principales *)
+
+open Permute
+open Bitset
 
 
 
@@ -320,23 +50,7 @@ and ctl_plus_state =
 
 
 
-let formula =
-  OrPP(
-      AndPP(
-	  AndPP(
-	      NotPP (NotPP (NotPP (NextP (APP 0)))),
-	      NextP (APP 0)
-	    ),
-	  NotPP(UntilP(APP 0, APP 1))),
-      NotPP (AndPP(
-		 OrPP(
-		     NextP (TrueP), NextP(TrueP)
-		   ),
-		 NextP TrueP
-	       )
-	    )
-    )
-			      
+      
 
 
 (**Renvoie la formule Ff*)
@@ -367,11 +81,18 @@ let rec formula_to_and_list f  =
 (**Transforme une liste de path_formula en une conjonction de path_formula *)
 let rec and_list_to_formula al =
   match al with
-  |[] -> failwith "une and_list ne doit jamais être vide"
+  |[] -> True
   |[f] -> f
   |f::q -> And (f, and_list_to_formula q)
 
-	  
+(**Transforme une liste de path_formula en une conjonction de path_formula *)
+let rec or_list_to_formula al =
+  match al with
+  |[] -> failwith "une or_list ne doit jamais être vide"
+  |[f] -> f
+  |f::q -> Or (f, or_list_to_formula q)
+
+(*
 (**Transforme une disjonction de CTL formula en liste de and_list*)
 let rec formula_to_or_list f   =
   match f with
@@ -383,7 +104,7 @@ let rec or_list_to_formula ol =
   match ol with
   |[] -> failwith "une or_list ne doit jamais être vide"
   |[l] -> and_list_to_formula l
-  |l::q -> Or (and_list_to_formula l, or_list_to_formula q)
+  |l::q -> Or (and_list_to_formula l, or_list_to_formula q)*)
 
 (*Fonction pour CTL+*)
 	
@@ -402,17 +123,17 @@ let rec and_list_to_formula_p al =
 
 	  
 (**Transforme une disjonction de path_formula en liste de path_formula*)
-let rec formula_to_or_list_p (f : ctl_plus_path)  =
+let rec formula_to_or_and_list_p (f : ctl_plus_path)  =
   match f with
-  |OrPP(g1,g2) -> (formula_to_or_list_p g1)@(formula_to_or_list_p g2)
+  |OrPP(g1,g2) -> (formula_to_or_and_list_p g1)@(formula_to_or_and_list_p g2)
   |_ -> [formula_to_and_list_p f]
 
 (**Transforme une liste de and_list  en une disjonction de path_formula *)
-let rec or_list_to_formula_p ol =
+let rec or_and_list_to_formula_p ol =
   match ol with
   |[] -> failwith "une or_list ne doit jamais être vide"
   |[l] -> and_list_to_formula_p l
-  |l::q -> OrPP (and_list_to_formula_p l, or_list_to_formula_p q)
+  |l::q -> OrPP (and_list_to_formula_p l, or_and_list_to_formula_p q)
 
 (*END Quelques fonctions de conversions*)
 
@@ -472,8 +193,8 @@ let rec drown_ands f = match f with
 
 (**Donne la formule sous la forme que l'on souhaite avoir à l'étape 2*)
 let or_list_without_negs f =
-  formula_to_or_list_p (drown_ands ( or_list_to_formula_p(
-				       elim_not_or_list (formula_to_or_list_p f)
+  formula_to_or_and_list_p (drown_ands ( or_and_list_to_formula_p(
+				       elim_not_or_list (formula_to_or_and_list_p f)
 				     )))
 
 (*END Étape II.2*)
@@ -482,26 +203,43 @@ let or_list_without_negs f =
 
 (**Agrège les formules next et les formules globally dans une and_list*)
 let aggregate_next_globally al =
-  let nexts = ref TrueP and globallies = ref TrueP in
+  let found_next = ref false and nexts = ref TrueP in 
+  let found_globally = ref false and globallies = ref TrueP in
   let rec aggregate_rec l = match l with
     |[] -> []
     |f::q ->
       begin
 	match f with
+	
 	|NextP g ->
-	  nexts := AndPS(g,!nexts);
+	  
+	  if !found_next then 
+	    nexts := AndPS(g,!nexts)
+	  else
+	    (nexts := g ; found_next := true;);
 	  aggregate_rec q
 	|GloballyP g ->
-	  globallies := AndPS(g,!globallies);
+	  if !found_globally then 
+	    globallies := AndPS(g,!globallies)
+	  else
+	    (globallies := g ; found_globally := true);
 	  aggregate_rec q
 	|_ -> f :: aggregate_rec q
       end
   in
 
-  (NextP !nexts)::(GloballyP !globallies)::aggregate_rec al
+  let aggr = aggregate_rec al in 
+  match (!found_next,!found_globally) with
+  |(false,false) -> aggr
+  |(false,true) -> (GloballyP !globallies)::aggr
+  |(true,false) -> (NextP !nexts)::aggr
+  |(true,true) -> (NextP !nexts)::(GloballyP !globallies)::aggr
 
 (**Transforme une formule CTL+ en disjonctions de formules de forme (2))
 let ctlP_to_form2*)
+
+let path_formula_to_form2 f = 
+  List.map aggregate_next_globally (or_list_without_negs f)
 
 
 (*END Étape II.3*)
@@ -519,11 +257,11 @@ let ctlP_to_form2*)
 *)
 
 let get_psi = function
-  | Until(psi,psi') -> psi
+  | Until(psi,_) -> psi
   | _ -> failwith "untils ne contient pas que des U dans get_psi"
 
 let get_psi' = function
-  | Until(psi,psi') -> psi'
+  | Until(_,psi') -> psi'
   | _ -> failwith "untils ne contient pas que des U dans get_psi'"
 			   
 (**Permet de récupérer les psi'_i  *)
@@ -573,35 +311,40 @@ let psi'_perm al p j =
   get_psi' (List.nth al (List.nth p j))
 
 
-let form1_to_CTL_perm untils phi p =
+let form1_to_ctl_perm untils phi p =
   let n = List.length p in 
-  let rec form1_to_CTL_perm_tmp k =
+  let rec form1_to_ctl_perm_tmp k =
     if k = n then
       Exists (Globally phi)
     else
       Exists (
 	  Until(
 	      And(and_psi_minus_perm untils p k , phi),
-	      And(psi'_perm untils p k, form1_to_CTL_perm_tmp (k+1))
+	      And(psi'_perm untils p k, form1_to_ctl_perm_tmp (k+1))
 	    )
 	)
   in
 
-  form1_to_CTL_perm_tmp 0
+  form1_to_ctl_perm_tmp 0
   
 	      
 
 (**ici, on représente une formule de forme 2 par une and_list qui
  * commence par le globally et qui est suivi d'une liste d'untils *)
-let form1_to_CTL phi untils = 
+let form1_to_ctl phi untils = 
   let m = List.length untils in
-  let n = fact m in
-  let ctl_f = ref (Not True) in
-  for i = 0 to n - 1 do
-    let p = perm i m in
-    ctl_f := Or(form1_to_CTL_perm untils phi p, !ctl_f)
-  done;
-  !ctl_f
+  if m = 0 then 
+    True
+  else
+    begin
+      let n = fact m in
+      let ctl_f = ref (Not True) in
+      for i = 0 to n - 1 do
+	let p = perm i m in
+	ctl_f := Or(form1_to_ctl_perm untils phi p, !ctl_f)
+      done;
+      !ctl_f
+    end
  
 				
 
@@ -618,48 +361,136 @@ de cet ensemble *)
 
 
 (**ici, on représente une formule de forme 2 par une and_list *)
-let form2_to_CTL al = match al with
-  |(Next phi)::(Globally phi')::untils ->
-    let lu = List.length untils in
-    let module Fin : FIN = struct
-      type t = int
-      let max = lu
-      let to_int n = n mod lu
-      let of_int n = n
-    end in
-    let module Ens = Make(Fin) in
+let form2_to_ctl al =  
 
-    (* Pour un ensemble donné, on applique la trnasformation de la question 4*)
-    let form2_to_CTL_set phi phi' untils s =
-      let f1 = form1_to_CTL phi' (Ens.extract untils (Ens.complementary s)) in 
-      And(and_list_to_formula (get_psi'_list (Ens.extract untils s)),
-	  And(phi',
-	      Exists(Next(
-			 And(phi,f1)
-		       ))
-	     ))
-    in
+  let (phi,phi',untils) = match al with 
+    |(Next f)::(Globally f')::u -> (f,f',u) 
+    |(Next f)::u -> (f,True,u)
+    |(Globally f')::u -> (True,f',u)
+    |u -> (True,True,u) in 
 
-	
-    let gen = Ens.sub_generator () in
-    let set = ref (gen ()) in
-    let ctl_f = ref (Not True) in 
-    while !set <> None do
-      let Some s = !set in
-       ctl_f := Or(form2_to_CTL_set phi phi' untils s, !ctl_f)
-    done;
-    !ctl_f
-    
-  |_ -> failwith "la fonction form2_to_CTL a n'a pas reçu une and_list 
-		  correcte en argument"
-							 
+  let lu = List.length untils in
+
+  if lu = 0 then 
+    And(phi',Exists(Next(And(phi,Exists(Globally(phi'))))))
+  else
+    begin
+      let module Fin : FIN = struct
+	type t = int
+	let max = lu
+	let to_int n = n mod lu
+	let of_int n = n
+      end in
+      let module Ens = Make(Fin) in
+
+  (* Pour un ensemble donné, on applique la transformation de la question 4*)
+      let form2_to_ctl_set phi phi' untils s =
+	let f1 = form1_to_ctl phi' (Ens.extract untils (Ens.complementary s)) in 
+	And(and_list_to_formula (get_psi'_list (Ens.extract untils s)),
+	    And(phi',
+		Exists(Next(
+		  And(phi,f1)
+		))
+	    ))
+      in
+
+      
+      let gen = Ens.sub_generator () in
+      let set = ref (gen ()) in
+      let ctl_f = ref (Not True) in 
+      while 
+	match !set with 
+	|None -> false
+	|Some s ->
+	  ctl_f := Or(form2_to_ctl_set phi phi' untils s, !ctl_f);
+	  set := gen();
+	  true
+
+	  do
+	    ()
+	  done;
+      !ctl_f
+    end
+      
+      
 
 
 (*END Étape III.2*)
 
+
+(*BEGIN IV :  Fonctions principales*)
+
+let rec exists_or_to_or_exists l = match l with 
+  |[] -> failwith "une or liste ne doit pas être vide (exist_or_to_or_exist)"
+  |[x] -> Exists x
+  |x::q -> Or (Exists x, exists_or_to_or_exists q)
+
+let rec ctlp_to_ctl fs = match fs with 
+  |TrueP -> True
+  |APP n -> AP n
+  |NotPS fs' -> Not (ctlp_to_ctl fs')
+  |AndPS(fs', fs'') ->  And(ctlp_to_ctl fs', ctlp_to_ctl fs'')
+  |ExistsP fp -> 
+    let f2 = path_formula_to_form2 fp in 
+    let apply_ctlp_to_ctl fp = match fp with 
+      |NextP fs' -> Next (ctlp_to_ctl  fs')
+      |GloballyP fs' ->  Globally (ctlp_to_ctl  fs')
+      |UntilP(fs',fs'') -> Until(ctlp_to_ctl fs', ctlp_to_ctl fs'')
+      |_ -> failwith "On ne devrait pas trouver de 'ou', de 'et' ou de 'non' après l'application de path_formula to form2"
+    in
+    let f2_ctl = List.map (List.map apply_ctlp_to_ctl) f2 in
+    or_list_to_formula (List.map form2_to_ctl f2_ctl) 
+    
+
+
+let formula =
+  ExistsP (OrPP(
+      AndPP(
+	  AndPP(
+	      NotPP (NotPP (NotPP (NextP (APP 0)))),
+	      NextP (APP 0)
+	    ),
+	  NotPP(UntilP(APP 0, APP 1))),
+      NotPP (AndPP(
+		 OrPP(
+		     NextP (TrueP), NextP(TrueP)
+		   ),
+		 NextP TrueP
+	       )
+	    )
+    ))
+	
+
 		     
 
-let main () = ()
+let main () = 
+  ignore (ctlp_to_ctl formula)
 
 
 let () = main()
+
+(* En utilisant le top-level, j'obtiens pour formula le résultat suivant : 
+Or
+ (And (AP 0,
+   Exists (Next (And (And (Not (AP 0), AP 0), Exists (Globally (AP 0)))))),
+ Or
+  (Or
+    (And (And (Not (AP 0), Not (AP 1)),
+      And (True, Exists (Next (And (And (Not (AP 0), AP 0), True))))),
+    Or
+     (And (True,
+       And (True,
+        Exists
+         (Next
+           (And (And (Not (AP 0), AP 0),
+             Or
+              (Exists
+                (Until (And (And (AP 0, Not (AP 1)), True),
+                  And (And (Not (AP 0), Not (AP 1)), Exists (Globally True)))),
+              Not True)))))),
+     Not True)),
+  Or
+   (And (True,
+     Exists (Next (And (And (Not True, Not True), Exists (Globally True))))),
+   And (True, Exists (Next (And (Not True, Exists (Globally True))))))))
+*)

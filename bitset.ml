@@ -1,70 +1,75 @@
+
 (*ce fichier contient un module permettant de gérer les ensembles finis
  * de manière efficace. Il a été codé par Alice RIXTE dans le cadre du
  * DM du cours de programmation avancée. Le complémentaire et le générateurs
  * ont été ajoutés pour le DM de vérification. *)
 
-
 (** Signature représentant les types finis.
- *
- * Le type [t] est équipé de fonctions [to_int] et [of_int],
- * qu'on supposera inverses l'une de l'autre.
- *
- * De plus le type est supposé fini, c'est à dire qu'on ne
- * rencontrera que des valeurs [x] telles que
- * [0 <= to_int x < max].
- *
- * La fonction [of_int] ne devra être appelée que sur des
- * valeurs [i] tel que [0 <= i < max]. *)
+  *
+  * Le type [t] est équipé de fonctions [to_int] et [of_int],
+  * qu'on supposera inverses l'une de l'autre.
+  *
+  * De plus le type est supposé fini, c'est à dire qu'on ne
+  * rencontrera que des valeurs [x] telles que
+  * [0 <= to_int x < max].
+  *
+  * La fonction [of_int] ne devra être appelée que sur des
+  * valeurs [i] tel que [0 <= i < max]. *)
 module type FIN = sig
-    type t
-    val max : int
-    val to_int : t -> int
-    val of_int : int -> t
-  end
+  type t
+  val max : int
+  val to_int : t -> int
+  val of_int : int -> t
+end
 
 (** Signature décrivant un type d'ensembles [t] dont les éléments
- * sont dans [elt].
- *
- * Les opérations ne modifient jamais en place un ensemble,
- * mais ceux-ci sont manipulés dans un style persistant.
- *
- * L'égalité structurelle d'OCaml sur [t] doit correspondre à
- * l'égalité ensembliste. *)
+  * sont dans [elt].
+  *
+  * Les opérations ne modifient jamais en place un ensemble,
+  * mais ceux-ci sont manipulés dans un style persistant.
+  *
+  * L'égalité structurelle d'OCaml sur [t] doit correspondre à
+  * l'égalité ensembliste. *)
 module type SET = sig
-    type t
-    type elt
+  type t
+  type elt
 
-    (** Cardinal d'un ensemble, en temps constant *)
-    val cardinal : t -> int
+  (** Cardinal d'un ensemble, en temps constant *)
+  val cardinal : t -> int
 
-    (** Ensemble vide *)
-    val empty : t
+  (** Ensemble vide *)
+  val empty : t
 
-    (** Création d'un ensemble contenant tous les éléments
-     * pour lesquels une fonction est vraie. *)
-    val init : (elt -> bool) -> t
+  (** Création d'un ensemble contenant tous les éléments
+    * pour lesquels une fonction est vraie. *)
+  val init : (elt -> bool) -> t
 
-    (** Ajout d'un élément *)
-    val add : t -> elt -> t
+  (** Ajout d'un élément *)
+  val add : t -> elt -> t
 
-    (** Suppression d'un élément *)
-    val remove : t -> elt -> t
+  (** Suppression d'un élément *)
+  val remove : t -> elt -> t
 
-    (** Test d'appartenance *)
-    val member : t -> elt -> bool
+  (** Test d'appartenance *)
+  val member : t -> elt -> bool
 
-    (** Détermine si le premier ensemble est sous-ensemble du second *)
-    val subset : t -> t -> bool
+  (** Détermine si le premier ensemble est sous-ensemble du second *)
+  val subset : t -> t -> bool
 
-    (** Itération d'une fonction sur les éléments d'un ensemble *)
-    val iter : t -> (elt -> unit) -> unit
-				       
-    (** Générateur de l'ensemble des parties de l'univers*)
-    val sub_generator : unit -> unit -> t option
+  (** Itération d'une fonction sur les éléments d'un ensemble *)
+  val iter : t -> (elt -> unit) -> unit
 
-    (**Renvoie le complémentaire de l'ensemble passé en argument*)
-    val complementary : t -> t
-  end
+  (** Générateur de l'ensemble des parties de l'univers*)
+  val sub_generator : unit -> unit -> t option
+				
+  (**Renvoie le complémentaire de l'ensemble passé en argument*)
+  val complementary : t -> t
+
+  (**Permet d'extraire les éléments de la liste correspondant 
+    * aux numéros des éléments de s*)
+  val extract : 'a list -> t -> 'a list
+end
+
 
 		    
 module Make (F : FIN) : SET with type elt = F.t = struct
@@ -187,6 +192,17 @@ module Make (F : FIN) : SET with type elt = F.t = struct
     in
 
     next
+
+      
+  let extract l s =
+    let rec extract_tmp l n = match l with
+      |[]-> []
+      |x::q -> if member s (F.of_int n) then
+		 x::(extract_tmp q (n+1))
+	       else
+		 extract_tmp q (n+1)
+    in
+    extract_tmp l 0
       
       
 
@@ -199,8 +215,8 @@ end
 module I:FIN = struct
   type t = int
   let max = 1000
-  let to_int n = n mod 1000
-  let of_int n = n
+  let to_int n = n 
+  let of_int n = n mod 1000
 end
 
 module S = Make(I)
@@ -214,7 +230,7 @@ let p = (S.init (fun i -> let n = I.to_int i in n = 10 || n = 0 || n = 33))
 module J:FIN = struct
   type t = int
   let max = 3
-  let to_int n = n mod 3
-  let of_int n = n
+  let to_int n = n
+  let of_int n = n mod 3
 end
 module T = Make(J)

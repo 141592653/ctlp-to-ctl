@@ -1,2 +1,2 @@
 default :
-	ocamlbuild main.native --
+	ocamlbuild main.native
